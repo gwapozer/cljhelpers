@@ -1,24 +1,29 @@
 (ns cljhelpers.plugin
   (:import (java.io File)
-           (java.net URL URLClassLoader)
-           (java.lang.reflect Method)))
+           (javas plugin)
+           (java.net URL URLClassLoader))
+  )
 
 (defn add-to-classpath [s]
-
-  (println "Start loading class ...")
 
   (def f (File. s))
   (def u (.toURI f))
   (def url (.toURL u))
 
-  (println url)
-
   (let [urlClassLoader (-> (Thread/currentThread) (.getContextClassLoader))]
     (def urls (.getURLs urlClassLoader))
-    ;(def class (URLClassLoader/class))
-    (println (count urls))
-  )
+    (println (str "Total classes: " (count urls)))
 
-  (println "End loading class ...")
+    ;private static final Class[] parameters = new Class[]{URL.class};
+    (def urlcl (.getClass url))
+    ;(def testparms (URL. url))
+    ;(println testparms)
+    ;end
 
+    (def urlClass (.getClass (URLClassLoader. urls)))
+    (def parms (plugin/GetParameters)) ;todo interop
+    (let [method (.getDeclaredMethod urlClass "addURL" parms)]
+      (.setAccessible method true)
+      (.invoke method urlClassLoader (object-array [url]))
+      ))
   )
