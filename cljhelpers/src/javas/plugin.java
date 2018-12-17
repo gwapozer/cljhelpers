@@ -29,6 +29,11 @@ public class plugin {
         //Class loadedClass = urlClassLoader.loadClass("plugin.core");
     }
 
+    public static Object GetParameters()
+    {
+        return parameters;
+    }
+
     public static void main(String args[])
     {
         System.out.println("Main function call");
