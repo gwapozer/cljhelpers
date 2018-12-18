@@ -26,12 +26,6 @@ public class plugin {
         Method method = urlClass.getDeclaredMethod("addURL",parameters);
         method.setAccessible(true);
         method.invoke(urlClassLoader, new Object[] { u });
-        //Class loadedClass = urlClassLoader.loadClass("plugin.core");
-    }
-
-    public static Object GetParameters()
-    {
-        return parameters;
     }
 
     public static void main(String args[])
