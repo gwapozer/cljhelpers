@@ -1,29 +1,31 @@
 (ns cljhelpers.plugin
   (:import (java.io File)
-           (javas plugin)
-           (java.net URL URLClassLoader))
+           (java.net URLClassLoader))
+  )
+
+(defn is-in-cp [sfile urls]
+  (def found false)
+  (loop [i 0]
+    (if (< i (count urls))
+      (do (if (= sfile (.getFile (nth urls i))) (def found true))
+          (recur (inc i))
+          )
+      )
+    )
+  (= found true)
   )
 
 (defn add-to-classpath [s]
-
-  (def f (File. s))
-  (def u (.toURI f))
-  (def url (.toURL u))
-
+  (def url (.. (File. s) toURI toURL))
   (let [urlClassLoader (-> (Thread/currentThread) (.getContextClassLoader))]
     (def urls (.getURLs urlClassLoader))
-    (println (str "Total classes: " (count urls)))
-
-    ;private static final Class[] parameters = new Class[]{URL.class};
-    (def urlcl (.getClass url))
-    ;(def testparms (URL. url))
-    ;(println testparms)
-    ;end
-
-    (def urlClass (.getClass (URLClassLoader. urls)))
-    (def parms (plugin/GetParameters)) ;todo interop
-    (let [method (.getDeclaredMethod urlClass "addURL" parms)]
-      (.setAccessible method true)
-      (.invoke method urlClassLoader (object-array [url]))
-      ))
+    (when (= (is-in-cp (.getFile url) urls) false)
+      (def params (into-array Class [(.getClass url)]) )
+      (def urlClass (.getClass (URLClassLoader. urls)))
+      (let [method (.getDeclaredMethod urlClass "addURL" params)]
+        (.setAccessible method true)
+        (.invoke method urlClassLoader (object-array [url]))
+        )
+      )
+    )
   )
