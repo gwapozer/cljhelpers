@@ -1,11 +1,13 @@
 (ns cljhelpers.item_obj)
 
-(def atom-item (atom nil))
-
-(defn set-atom [x]
-  (reset! atom-item x)
+(defn atomizer []
+  (atom nil)
   )
 
-(defn add-item [item]
-  (reset! atom-item (conj @atom-item item))
+(defn set-atom [atom-obj x]
+  (reset! atom-obj x)
+  )
+
+(defn add-item [atom-obj item]
+  (reset! atom-obj (conj @atom-obj item))
   )
