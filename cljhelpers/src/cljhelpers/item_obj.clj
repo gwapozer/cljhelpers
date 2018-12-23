@@ -4,7 +4,7 @@
   (atom nil)
   )
 
-(defn set-atom [atom-obj x]
+(defn set-atomizer [atom-obj x]
   (reset! atom-obj x)
   )
 
