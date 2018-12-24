@@ -1,4 +1,5 @@
-(ns cljhelpers.eval-obj)
+(ns cljhelpers.eval-obj
+  (:require [clojure.string :as str]))
 
 (defn iterate-obj [obj-list msg]
   (if (> (count (rest obj-list)) 0)
@@ -27,5 +28,31 @@
       (sort-obj (rest comparators) sorted-data)
       )
     (sort (first comparators) data)
+    )
+  )
+
+(defn map-obj [mapors data]
+  (if (> (count (rest mapors)) 0)
+    (do
+      (def mapped-data (map  (first mapors) data))
+      (map-obj (rest mapors) mapped-data)
+      )
+    (map (first mapors) data)
+    )
+  )
+
+(defn update-obj [updators data]
+  (if (> (count (rest updators)) 0)
+    (do
+      (def updated-data
+        (if (vector? data)
+           (map (fn [x] (update-in x [(read-string (first (first updators)))] (first (rest (first updators))))) data)
+           (update-in data [(read-string (first (first updators)))] (first (rest (first updators)))))
+          )
+      (update-obj (rest updators) updated-data)
+      )
+    (if (vector? data)
+      (map (fn [x] (update-in x (first (first updators)) (first (rest (first updators))))) data)
+      (update-in data (first (first updators)) (first (rest (first updators)))))
     )
   )
