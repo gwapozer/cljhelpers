@@ -46,8 +46,8 @@
     (do
       (def updated-data
         (if (vector? data)
-           (map (fn [x] (update-in x [(read-string (first (first updators)))] (first (rest (first updators))))) data)
-           (update-in data [(read-string (first (first updators)))] (first (rest (first updators)))))
+           (map (fn [x] (update-in x (first (first updators)) (first (rest (first updators))))) data)
+           (update-in data (first (first updators)) (first (rest (first updators)))))
           )
       (update-obj (rest updators) updated-data)
       )
