@@ -24,7 +24,7 @@
     )
   )
 
-(defn get-data [data-type result i]
+(defn- get-data [data-type result i]
   (cond
     (= data-type "BIT") (.getBoolean result i)
     (= data-type "TINYINT") (.getShort result i)
