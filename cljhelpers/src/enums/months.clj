@@ -1,0 +1,17 @@
+(ns enums.months
+  (:require  [entity.IdName :refer :all])
+  (:import (entity.IdName IdName)))
+
+(def months #{(IdName. 1 "January")
+                (IdName. 2 "February")
+                (IdName. 3 "March")
+                (IdName. 4 "April")
+                (IdName. 5 "May")
+                (IdName. 6 "June")
+                (IdName. 7 "July")
+                (IdName. 8 "August")
+                (IdName. 9 "September")
+                (IdName. 10 "October")
+                (IdName. 11 "November")
+                (IdName. 12 "December")
+                })
