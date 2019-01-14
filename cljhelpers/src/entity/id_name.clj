@@ -1,9 +1,9 @@
 (ns entity.id-name)
 
-(defstruct id-name :id :name )
+(defstruct idname :id :name)
 
 (defn id-name [id name]
-  (struct id-name id name)
+  (struct idname id name)
   )
 
 (defn list-add [curr new]
