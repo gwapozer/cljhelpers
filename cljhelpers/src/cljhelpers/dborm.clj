@@ -1,11 +1,40 @@
 (ns cljhelpers.dborm
+  (:require [clojure.java.jdbc :as jdbc]
+            [cljhelpers.fx_obj :as fx_obj]
+            [enums.enumerator :as enumobj]
+            [cljhelpers.eval-obj :as oe]
+            [widget.evalobj-gui :as egui]
+           )
   (:import (java.util Date)
            (java.sql Time Blob Clob)))
 
 (defrecord Where-Cl [field filter value condition Where-Cl])
+(defrecord obj-val [data-type value])
+
+(defn- get-datatype [value]
+  (cond
+    (nil? value) nil
+    (instance? Boolean value) "BOOLEAN"
+    (instance? Byte value) "BYTE"
+    (instance? Short value) "SHORT"
+    (instance? Integer value) "INTEGER"
+    (instance? Long value) "LONG"
+    (instance? Float value) "FLOAT"
+    (instance? Double value) "DOUBLE"
+    (instance? BigDecimal value) "DECIMAL"
+    (instance? String value) "STRING"
+    (instance? (byte []) value) "BOOLEAN"
+    (instance? Date value) "DATE"
+    (instance? Time value) "TIME"
+    (instance? Blob value) "BLOB"
+    (instance? Clob value) "CLOB"
+    :else "OBJECT"
+    )
+  )
 
 (defn- set-data [prep-stmt set-cnt value]
   (cond
+    (nil? value) (doto prep-stmt (.setObject set-cnt value))
     (instance? Boolean value) (doto prep-stmt (.setBoolean set-cnt value))
     (instance? Byte value) (doto prep-stmt (.setByte set-cnt value))
     (instance? Short value) (doto prep-stmt (.setShort set-cnt value))
@@ -82,12 +111,92 @@
     )
   )
 
-(defn- get-record-keys [record]
-  (def key-list (map #(str %)(keys record)))
+(defn- get-record-name
+  [record]
+  (def str-data (prn-str record))
+  (def str-mod (get-string-to-delim str-data "{"))
+  (def str-last (get-string-to-delim (reduce str (reverse str-mod))  "."))
+  (reduce str (reverse str-last))
+  )
+
+(defn- get-record-keys-list
+  ([entity]
+   (map #(reduce str (rest (str %)) )(keys entity))
+    )
+  ([entity-definition entity]
+   (let [pks (enumobj/GetEnumListByKey entity-definition :is-pk true)
+         pks-value (enumobj/GetEnumValueList pks :name)
+         record-keys (get-record-keys-list entity)]
+     (remove (into #{} pks-value) record-keys)
+     )
+    )
+  )
+
+(defn- get-record-values-list
+  ([entity]
+   (def record-keys (get-record-keys-list entity))
+   (def new-keys (map #(-> entity (read-string (str ":" %))) record-keys))
+   (zipmap new-keys (map #(-> entity %) new-keys))
+    ;(map #(-> %)(vals entity))
+    )
+
+  ([entity-definition entity]
+   (def record-keys (get-record-keys-list entity-definition entity ))
+   (def new-keys (map #(-> entity (read-string (str ":" %))) record-keys))
+   (zipmap new-keys (map #(-> entity %) new-keys))
+    ;(map #(-> entity %) new-keys)
+    )
+  )
+
+(defn- get-record-values-objdata-list
+  ([val-list]
+   (def seq-val (seq val-list))
+   (loop [i 0 my-vec []]
+     (if (< i (count seq-val))
+       (let [my-val (nth seq-val i)
+             data-val (val my-val)
+             data-type (get-datatype data-val)]
+         (def new-objval (obj-val. data-type data-val))
+         (recur (inc i) (conj my-vec new-objval))
+         )
+       my-vec
+       )
+     )
+    )
+  ([entity-definition val-list]
+   (def seq-val (seq val-list))
+   (loop [i 0 my-vec []]
+     (if (< i (count seq-val))
+       (let [my-val (nth seq-val i)
+             key-val (key my-val)
+             data-val (val my-val)
+             data-type (-> (enumobj/GetEnumByKey entity-definition :name (fx_obj/to-id key-val)) :data-type)]
+         (def new-objval (obj-val. data-type data-val))
+         (recur (inc i) (conj my-vec new-objval))
+         )
+       my-vec
+       )
+     )
+    )
+  )
+
+(defn- get-record-values
+  ([entity]
+   (def val-list (get-record-values-list entity))
+    (get-record-values-objdata-list val-list)
+    )
+  ([entity-definition entity]
+   (def val-list (get-record-values-list entity-definition entity))
+    (get-record-values-objdata-list entity-definition val-list)
+    )
+  )
+
+(defn- get-record-keys-cl [record]
+  (def key-list (get-record-keys-list record))
   (loop [i 0 my-string ""]
     (if (< i (count key-list))
       (do
-        (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (reduce str (rest (nth key-list i)) ) ))
+        (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (nth key-list i) ))
         )
       (do
         (str my-string)
@@ -96,13 +205,31 @@
     )
   )
 
-(defn- get-record-name [record]
+(defn- insert-cl-mapper [record-keys]
+  (apply str (butlast (apply str (repeatedly (count record-keys) #(str "?,")))))
+  )
 
-  (def str-data (prn-str record))
-  (def str-mod (get-string-to-delim str-data "{"))
-  (def str-last (get-string-to-delim (reduce str (reverse str-mod))  "."))
+(defn- insert-cl
+  ([entity]
+   (let [record-keys (get-record-keys-list entity)]
+     (insert-cl-mapper record-keys)
+     )
+    )
+  )
 
-  (reduce str (reverse str-last))
+(defn- update-cl-mapper [record-keys]
+  (apply str (butlast (apply str (map #(str % "= ?,") record-keys))))
+  )
+
+(defn- update-cl
+  ([entity]
+   (let [record-keys (get-record-keys-list entity)]
+     (update-cl-mapper record-keys)
+     ))
+  ([entity-definition entity]
+   (let [record-keys (get-record-keys-list entity-definition entity)]
+     (update-cl-mapper record-keys)
+     ))
   )
 
 (defn- where-cl [clauses]
@@ -110,11 +237,11 @@
     (if (< i (count clauses))
       (do
         (def clause (nth clauses i))
-        (def sql  (str
-                        (cond (nil? (:field clause)) "" :else (str " " (:field clause) " " (:filter clause) " " "?"))
-                        (cond (nil? (:condition clause)) "" :else (str " " (:condition clause) " "))
-                        (cond (nil? (:Where-Cl clause)) "" :else (str " (" (where-cl (:Where-Cl clause)) ") "))
-                        ))
+        (def sql
+          (str
+            (cond (nil? (:field clause)) "" :else (str " " (:field clause) " " (:filter clause) " " "?"))
+            (cond (nil? (:condition clause)) "" :else (str " " (:condition clause) " "))
+            (cond (nil? (:Where-Cl clause)) "" :else (str " (" (where-cl (:Where-Cl clause)) ") "))))
         (recur (inc i) (str sql-str sql))
         )
       sql-str
@@ -122,25 +249,33 @@
     )
   )
 
-(defn- prep-statement
-  ([prep-stmt clauses]
-   (prep-statement prep-stmt 1 clauses))
+(defn- create-prep-stmnt
   ([prep-stmt x clauses]
-   (loop [i 0 set-cnt x]
-     (if (< i (count clauses))
-       (do
-         (def clause (nth clauses i))
-         (set-data prep-stmt set-cnt (:value clause))
-         (if-not (nil? (:Where-Cl clause))
-           (prep-statement prep-stmt (+ set-cnt 1) (:Where-Cl clause))
-           )
-         (recur (inc i) (inc set-cnt))
-         )
-       prep-stmt
-       )
-     )
+    (loop [i 0 set-cnt x]
+      (if (< i (count clauses))
+        (do
+          (def clause (nth clauses i))
+          (set-data prep-stmt set-cnt (:value clause))
+          (if-not (nil? (:Where-Cl clause))
+            (create-prep-stmnt prep-stmt (+ set-cnt 1) (:Where-Cl clause))
+            )
+          (recur (inc i) (inc set-cnt))
+          )
+        prep-stmt
+        )
+      )
     )
   )
+
+(defn- prep-statement
+  ([prep-stmt clauses]
+   (create-prep-stmnt prep-stmt 1 clauses))
+  ([prep-stmt entity-values clauses]
+   (let [prep-entity-vals (create-prep-stmnt prep-stmt 1 entity-values)]
+     (create-prep-stmnt prep-entity-vals (inc (count entity-values)) clauses))
+    )
+  )
+
 (defn- make-hash
   "Return data in hash-map"
   [results]
@@ -165,21 +300,73 @@
 
 (defn db-get
   "Return the results of the select statement"
-  [conn entity whereclauses]
-  (def sql (str "select " (get-record-keys entity) " from " (get-record-name entity) (cond (nil? whereclauses) "" :else (str " where " (where-cl whereclauses)))))
+  [db-spec entity where-clauses]
+  (def conn (jdbc/get-connection db-spec))
+  (def sql (str "select " (get-record-keys-cl entity) " from " (get-record-name entity) (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
   (def prep-stmt (.prepareStatement conn sql))
-  (def sql-ps (prep-statement prep-stmt whereclauses))
+  (def sql-ps (prep-statement prep-stmt where-clauses))
   (def results (.executeQuery sql-ps))
 
-  (def vec-data (loop [i 0 rs-rlt (.next results) vec-buffer []]
-                  (if (< i (.getRow results))
-                    (do
-                      (def rslt (make-hash results))
-                      (recur (inc i) (def rs-rlt (.next results)) (conj vec-buffer rslt))
-                      )
-                    (conj vec-buffer rslt)
-                    )
-                  ))
+  (def vec-data
+    (loop [i 0 rs-rlt (.next results) vec-buffer []]
+      (if (< i (.getRow results))
+        (do
+          (def rslt (make-hash results))
+          (recur (inc i) (def rs-rlt (.next results)) (conj vec-buffer rslt))
+          )
+        (conj vec-buffer rslt)))
+    )
   (.close conn)
   vec-data
+  )
+
+(defn db-insert
+  "Add"
+  ([db-spec entity]
+   (def conn (jdbc/get-connection db-spec))
+   (def sql (str "insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity) ")"))
+   (def prep-stmt (.prepareStatement conn sql))
+   (def sql-ps (prep-statement prep-stmt (get-record-values entity)))
+    (def results (.executeUpdate sql-ps))
+   (.close conn)
+    )
+  ([db-spec entity-definition entity]
+   (def conn (jdbc/get-connection db-spec))
+   (def sql (str "insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity)  ")"))
+   (def prep-stmt (.prepareStatement conn sql))
+   (def sql-ps (prep-statement prep-stmt (get-record-values entity)))
+    (def results (.executeUpdate sql-ps))
+   (.close conn)
+    )
+  )
+
+(defn db-update
+  "update"
+  ([db-spec entity where-clauses]
+   (def conn (jdbc/get-connection db-spec))
+   (def sql (str "update "  (get-record-name entity) " set " (update-cl entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
+    (def prep-stmt (.prepareStatement conn sql))
+    (def sql-ps (prep-statement prep-stmt (get-record-values entity) where-clauses))
+    (def results (.executeUpdate sql-ps))
+   (.close conn)
+    )
+  ([db-spec entity-definition entity where-clauses]
+   (def conn (jdbc/get-connection db-spec))
+   (def sql (str "update "  (get-record-name entity) " set " (update-cl entity-definition entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
+   (def prep-stmt (.prepareStatement conn sql))
+   (def sql-ps (prep-statement prep-stmt (get-record-values entity-definition entity) where-clauses))
+   (def results (.executeUpdate sql-ps))
+   (.close conn)
+    )
+  )
+
+(defn db-delete
+  "Delete"
+  [db-spec entity where-clauses]
+  (def conn (jdbc/get-connection db-spec))
+  (def sql (str "delete " (get-record-name entity) (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
+  (def prep-stmt (.prepareStatement conn sql))
+  (def sql-ps (prep-statement prep-stmt where-clauses))
+  (def results (.executeUpdate sql-ps))
+  (.close conn)
   )
