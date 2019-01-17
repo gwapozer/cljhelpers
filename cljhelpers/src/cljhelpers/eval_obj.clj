@@ -56,3 +56,13 @@
       (update-in data (first (first updators)) (first (rest (first updators)))))
     )
   )
+
+(defn merge-hash-map-Id-Field
+  [vec-hash key-id key-field value]
+  (let [filter-hash (filter #(= (key-id vec-hash) value) vec-hash)]
+    (zipmap [key-id key-field]
+            (conj []
+                  (first (distinct (map #(key-id %) filter-hash)))
+                  (into [] (apply concat (map #(key-field %) filter-hash)))))
+    )
+  )
