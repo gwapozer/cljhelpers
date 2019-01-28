@@ -6,9 +6,11 @@
             [widget.evalobj-gui :as egui]
            )
   (:import (java.util Date)
-           (java.sql Time Blob Clob)))
+           (java.sql Time Blob Clob Timestamp)))
 
 (defrecord Where-Cl [field filter value condition Where-Cl])
+(defrecord Limit-Cl [value offset])
+
 (defrecord obj-val [data-type value])
 
 (defn- get-datatype [value]
@@ -26,6 +28,7 @@
     (instance? (byte []) value) "BOOLEAN"
     (instance? Date value) "DATE"
     (instance? Time value) "TIME"
+    (instance? Timestamp value) "TIMESTAMP"
     (instance? Blob value) "BLOB"
     (instance? Clob value) "CLOB"
     :else "OBJECT"
@@ -47,6 +50,7 @@
     (instance? (byte []) value) (doto prep-stmt (.setBytes set-cnt value))
     (instance? Date value) (doto prep-stmt (.setDate set-cnt value))
     (instance? Time value) (doto prep-stmt (.setTime set-cnt value))
+    (instance? Timestamp value) (doto prep-stmt (.setTimeStamp set-cnt value))
     (instance? Blob value) (doto prep-stmt (.setBlob set-cnt value))
     (instance? Clob value) (doto prep-stmt (.setClob set-cnt value))
     :else prep-stmt
@@ -70,7 +74,7 @@
     (= data-type "LONGVARCHAR") (.getString result i)
     (= data-type "DATE") (.getDate result i)
     (= data-type "TIME") (.getTime result i)
-    (= data-type "TIMESTAMP") (.getTimeStamp result i)
+    (= data-type "TIMESTAMP") (.getObject result i)
     (= data-type "BINARY") (.getBytes result i)
     (= data-type "VARBINARY") (.getBytes result i)
     (= data-type "LONGVARBINARY") (.getBytes result i)
@@ -121,7 +125,8 @@
 
 (defn- get-record-keys-list
   ([entity]
-   (map #(reduce str (rest (str %)) )(keys entity))
+   (let [rec-list (map #(reduce str (rest (str %)) )(keys entity))]
+     rec-list)
     )
   ([entity-definition entity]
    (let [pks (enumobj/GetEnumListByKey entity-definition :is-pk true)
@@ -134,17 +139,17 @@
 
 (defn- get-record-values-list
   ([entity]
-   (def record-keys (get-record-keys-list entity))
-   (def new-keys (map #(-> entity (read-string (str ":" %))) record-keys))
-   (zipmap new-keys (map #(-> entity %) new-keys))
-    ;(map #(-> %)(vals entity))
+   (let [record-keys (get-record-keys-list entity)
+         new-keys (map #(-> entity (read-string (str ":" %))) record-keys)]
+     (zipmap new-keys (map #(-> entity %) new-keys))
+     )
     )
 
   ([entity-definition entity]
-   (def record-keys (get-record-keys-list entity-definition entity ))
-   (def new-keys (map #(-> entity (read-string (str ":" %))) record-keys))
-   (zipmap new-keys (map #(-> entity %) new-keys))
-    ;(map #(-> entity %) new-keys)
+   (let [record-keys (get-record-keys-list entity-definition entity )
+         new-keys (map #(-> entity (read-string (str ":" %))) record-keys)]
+     (zipmap new-keys (map #(-> entity %) new-keys))
+     )
     )
   )
 
@@ -182,31 +187,33 @@
 
 (defn- get-record-values
   ([entity]
-   (def val-list (get-record-values-list entity))
-    (get-record-values-objdata-list val-list)
+   (let [val-list (get-record-values-list entity)]
+     (get-record-values-objdata-list val-list))
     )
   ([entity-definition entity]
-   (def val-list (get-record-values-list entity-definition entity))
-    (get-record-values-objdata-list entity-definition val-list)
+   (let [val-list (get-record-values-list entity-definition entity)]
+     (get-record-values-objdata-list entity-definition val-list))
     )
   )
 
 (defn- get-record-keys-cl [record]
-  (def key-list (get-record-keys-list record))
-  (loop [i 0 my-string ""]
-    (if (< i (count key-list))
-      (do
-        (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (nth key-list i) ))
+  (let [key-list (get-record-keys-list record)]
+    (loop [i 0 my-string ""]
+      (if (< i (count key-list))
+        (do
+          (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (nth key-list i) ))
+          )
+        (do
+          (str my-string)
+          )
         )
-      (do
-        (str my-string)
-        )
-      )
-    )
+      ))
   )
 
 (defn- insert-cl-mapper [record-keys]
-  (apply str (butlast (apply str (repeatedly (count record-keys) #(str "?,")))))
+  (let [cl-mapper (apply str (butlast (apply str (repeatedly (count record-keys) #(str "?,")))))]
+    cl-mapper)
+
   )
 
 (defn- insert-cl
@@ -218,7 +225,8 @@
   )
 
 (defn- update-cl-mapper [record-keys]
-  (apply str (butlast (apply str (map #(str % "= ?,") record-keys))))
+  (let [cl-mapper (apply str (butlast (apply str (map #(str % "= ?,") record-keys))))]
+    cl-mapper)
   )
 
 (defn- update-cl
@@ -246,6 +254,12 @@
         )
       sql-str
       )
+    )
+  )
+
+(defn- limit-cl [clause]
+  (let [sql-str (str " limit " (:offset clause) "," (:value clause))]
+    sql-str
     )
   )
 
@@ -281,9 +295,10 @@
   [results]
   (loop [i 1 hash-buffer {}]
     (if (<= i (-> results (.getMetaData) (.getColumnCount)))
-      (do
-        (def hash-data {(read-string (str ":" (-> results (.getMetaData) (.getColumnName i))))
-                        (get-data (-> results (.getMetaData) (.getColumnTypeName i)) results i)})
+      (let [col-name (-> results (.getMetaData) (.getColumnName i))
+            col-type (-> results (.getMetaData) (.getColumnTypeName i))]
+        (def hash-data {(read-string (str ":" (.toLowerCase col-name)))
+                        (get-data col-type results i)})
         (recur (inc i) (conj hash-buffer hash-data))
         )
       (do
@@ -298,26 +313,36 @@
   [entity-name hash-result]
   )
 
+(defn- map-data
+  [results]
+  (cond (= (nil? results) false)
+        (loop [i 0 rs-rlt (.next results) vec-buffer []]
+          (if (< i (.getRow results))
+            (do
+              (def rslt (make-hash results))
+              (recur (inc i) (def rs-rlt (.next results)) (conj vec-buffer rslt))
+              )
+            vec-buffer
+            ))
+        :else [])
+  )
+
 (defn db-get
   "Return the results of the select statement"
-  [db-spec entity where-clauses]
-  (def conn (jdbc/get-connection db-spec))
-  (def sql (str "select " (get-record-keys-cl entity) " from " (get-record-name entity) (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
-  (def prep-stmt (.prepareStatement conn sql))
-  (def sql-ps (prep-statement prep-stmt where-clauses))
-  (def results (.executeQuery sql-ps))
+  [db-spec entity where-clauses limit-clause]
+  (let [conn (jdbc/get-connection db-spec)
+        sql (str "select " (get-record-keys-cl entity) " from " (get-record-name entity)
+                 (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))
+                 (cond (nil? limit-clause) "" :else (limit-cl limit-clause)))
+        prep-stmt (.prepareStatement conn sql)
+        sql-ps (prep-statement prep-stmt where-clauses)
+        results (.executeQuery sql-ps)]
 
-  (def vec-data
-    (loop [i 0 rs-rlt (.next results) vec-buffer []]
-      (if (< i (.getRow results))
-        (do
-          (def rslt (make-hash results))
-          (recur (inc i) (def rs-rlt (.next results)) (conj vec-buffer rslt))
-          )
-        (conj vec-buffer rslt)))
+    (let [vec-data (map-data results)]
+      (.close conn)
+      vec-data
+      )
     )
-  (.close conn)
-  vec-data
   )
 
 (defn db-insert
@@ -369,4 +394,21 @@
   (def sql-ps (prep-statement prep-stmt where-clauses))
   (def results (.executeUpdate sql-ps))
   (.close conn)
+  )
+
+(defn db-count
+  "Return the results of the select statement"
+  [db-spec entity field where-clauses]
+  (let [conn (jdbc/get-connection db-spec)
+        sql (str "select count(" (str field) ") from " (get-record-name entity)
+                 (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses))))
+        prep-stmt (.prepareStatement conn sql)
+        sql-ps (prep-statement prep-stmt where-clauses)
+        results (.executeQuery sql-ps)]
+
+    (let [vec-data (map-data results)]
+      (.close conn)
+      vec-data
+      )
+    )
   )
