@@ -6,11 +6,11 @@
             [widget.evalobj-gui :as egui]
            )
   (:import (java.util Date)
-           (java.sql Time Blob Clob Timestamp)))
+           (java.sql Time Blob Clob Timestamp Types)))
 
+(defrecord Param-Cl [id value in-outType])
 (defrecord Where-Cl [field filter value condition Where-Cl])
 (defrecord Limit-Cl [value offset])
-
 (defrecord obj-val [data-type value])
 
 (defn- get-datatype [value]
@@ -57,48 +57,52 @@
     )
   )
 
+(defn- set-data-out [prep-stmt set-cnt type]
+  (doto prep-stmt (.registerOutParameter set-cnt type))
+  )
+
 (defn- get-data [data-type result i]
   (cond
-    (= data-type "BIT") (.getBoolean result i)
-    (= data-type "TINYINT") (.getShort result i)
-    (= data-type "SMALLINT") (.getShort result i)
-    (= data-type "INTEGER") (.getInt result i)
-    (= data-type "BIGINT") (.getLong result i)
-    (= data-type "FLOAT") (.getFloat result i)
-    (= data-type "REAL") (.getFloat result i)
-    (= data-type "DOUBLE") (.getDouble result i)
-    (= data-type "NUMERIC") (.getBigDecimal result i)
-    (= data-type "DECIMAL") (.getBigDecimal result i)
-    (= data-type "CHAR") (.getString result i)
-    (= data-type "VARCHAR") (.getString result i)
-    (= data-type "LONGVARCHAR") (.getString result i)
-    (= data-type "DATE") (.getDate result i)
-    (= data-type "TIME") (.getTime result i)
-    (= data-type "TIMESTAMP") (.getObject result i)
-    (= data-type "BINARY") (.getBytes result i)
-    (= data-type "VARBINARY") (.getBytes result i)
-    (= data-type "LONGVARBINARY") (.getBytes result i)
-    (= data-type "NULL") (.getObject result i)
-    (= data-type "OTHER") (.getObject result i)
-    (= data-type "JAVA_OBJECT") (.getObject result i)
-    (= data-type "DISTINCT") (.getObject result i)
-    (= data-type "STRUCT") (.getObject result i)
-    (= data-type "ARRAY") (.getObject result i)
-    (= data-type "BLOB") (.getBlob result i)
-    (= data-type "CLOB") (.getClob result i)
-    (= data-type "REF") (.getRef result i)
-    (= data-type "DATALINK") (.getObject result i)
-    (= data-type "BOOLEAN") (.getBoolean result i)
-    (= data-type "ROWID") (.getRowId result i)
-    (= data-type "NCHAR") (.getString result i)
-    (= data-type "NVARCHAR") (.getString result i)
-    (= data-type "LONGNVARCHAR") (.getString result i)
-    (= data-type "NCLOB") (.getNClob result i)
-    (= data-type "SQLXML") (.getSQLXML result i)
-    (= data-type "REF_CURSOR") (.getObject result i)
-    (= data-type "TIME_WITH_TIMEZONE") (.getObject result i)
-    (= data-type "TIMESTAMP_WITH_TIMEZONE") (.getObject result i)
-    :else nil
+    (or (= data-type (Types/BIT)) (= data-type "BIT"))  (.getBoolean result i)
+    (or (= data-type (Types/TINYINT)) (= data-type "TINYINT")) (.getShort result i)
+    (or (= data-type (Types/SMALLINT)) (= data-type "SMALLINT")) (.getShort result i)
+    (or (= data-type (Types/INTEGER)) (= data-type "INTEGER") (= data-type "INT")) (.getInt result i)
+    (or (= data-type (Types/BIGINT)) (= data-type "BIGINT")) (.getLong result i)
+    (or (= data-type (Types/FLOAT)) (= data-type "FLOAT")) (.getFloat result i)
+    (or (= data-type (Types/REAL)) (= data-type "REAL")) (.getFloat result i)
+    (or (= data-type (Types/DOUBLE)) (= data-type "DOUBLE")) (.getDouble result i)
+    (or (= data-type (Types/NUMERIC)) (= data-type "NUMERIC")) (.getBigDecimal result i)
+    (or (= data-type (Types/DECIMAL)) (= data-type "DECIMAL")) (.getBigDecimal result i)
+    (or (= data-type (Types/CHAR)) (= data-type "CHAR")) (.getString result i)
+    (or (= data-type (Types/VARCHAR)) (= data-type "VARCHAR")) (.getString result i)
+    (or (= data-type (Types/LONGVARCHAR)) (= data-type "LONGVARCHAR")) (.getString result i)
+    (or (= data-type (Types/DATE)) (= data-type "DATE")) (.getDate result i)
+    (or (= data-type (Types/TIME)) (= data-type "TIME")) (.getTime result i)
+    (or (= data-type (Types/TIMESTAMP)) (= data-type "TIMESTAMP")) (.getObject result i)
+    (or (= data-type (Types/BINARY)) (= data-type "BINARY")) (.getBytes result i)
+    (or (= data-type (Types/VARBINARY)) (= data-type "VARBINARY")) (.getBytes result i)
+    (or (= data-type (Types/LONGVARBINARY)) (= data-type "LONGVARBINARY")) (.getBytes result i)
+    (or (= data-type (Types/NULL)) (= data-type "NULL")) (.getObject result i)
+    (or (= data-type (Types/OTHER)) (= data-type "OTHER")) (.getObject result i)
+    (or (= data-type (Types/JAVA_OBJECT)) (= data-type "JAVA_OBJECT")) (.getObject result i)
+    (or (= data-type (Types/DISTINCT)) (= data-type "DISTINCT")) (.getObject result i)
+    (or (= data-type (Types/STRUCT)) (= data-type "STRUCT")) (.getObject result i)
+    (or (= data-type (Types/ARRAY)) (= data-type "ARRAY")) (.getObject result i)
+    (or (= data-type (Types/BLOB)) (= data-type "BLOB")) (.getBlob result i)
+    (or (= data-type (Types/CLOB)) (= data-type "CLOB")) (.getClob result i)
+    (or (= data-type (Types/REF)) (= data-type "REF")) (.getRef result i)
+    (or (= data-type (Types/DATALINK)) (= data-type "DATALINK")) (.getObject result i)
+    (or (= data-type (Types/BOOLEAN)) (= data-type "BOOLEAN")) (.getBoolean result i)
+    (or (= data-type (Types/ROWID)) (= data-type "ROWID")) (.getRowId result i)
+    (or (= data-type (Types/NCHAR)) (= data-type "NCHAR")) (.getString result i)
+    (or (= data-type (Types/NVARCHAR)) (= data-type "NVARCHAR")) (.getString result i)
+    (or (= data-type (Types/LONGNVARCHAR)) (= data-type "LONGNVARCHAR")) (.getString result i)
+    (or (= data-type (Types/NCLOB)) (= data-type "NCLOB")) (.getNClob result i)
+    (or (= data-type (Types/SQLXML)) (= data-type "SQLXML")) (.getSQLXML result i)
+    (or (= data-type (Types/REF_CURSOR)) (= data-type "REF_CURSOR")) (.getObject result i)
+    (or (= data-type (Types/TIME_WITH_TIMEZONE)) (= data-type "TIME_WITH_TIMEZONE")) (.getObject result i)
+    (or (= data-type (Types/TIMESTAMP_WITH_TIMEZONE)) (= data-type "TIMESTAMP_WITH_TIMEZONE")) (.getObject result i)
+    :else (.getObject result i)
     )
   )
 
@@ -210,6 +214,11 @@
       ))
   )
 
+(defn- in-outType?
+  [parameters]
+  (false? (every? #(nil? %) (map #(:in-outType %) parameters)))
+  )
+
 (defn- insert-cl-mapper [record-keys]
   (let [cl-mapper (apply str (butlast (apply str (repeatedly (count record-keys) #(str "?,")))))]
     cl-mapper)
@@ -263,6 +272,11 @@
     )
   )
 
+(defn- proc-cl [parameters]
+  (let [cl-mapper (apply str (butlast (apply str (map (fn[_](str "?,"))  parameters))))]
+    cl-mapper)
+  )
+
 (defn- create-prep-stmnt
   ([prep-stmt x clauses]
     (loop [i 0 set-cnt x]
@@ -290,6 +304,35 @@
     )
   )
 
+(defn- create-proc-prep-stmnt
+  ([prep-stmt x parameters]
+   (loop [i 0 set-cnt x]
+     (if (< i (count parameters))
+       (do
+         (def parameter (nth parameters i))
+         (cond (nil? (:in-outType parameter))
+               (set-data prep-stmt set-cnt (:value parameter))
+               :else
+               (set-data-out prep-stmt set-cnt (:in-outType parameter))
+               )
+
+         (recur (inc i) (inc set-cnt))
+         )
+       prep-stmt
+       )
+     )
+    )
+  )
+
+(defn- proc-prep-statement
+  ([prep-stmt parameters]
+   (create-proc-prep-stmnt prep-stmt 1 parameters))
+  ([prep-stmt entity-values parameters]
+   (let [prep-entity-vals (create-proc-prep-stmnt prep-stmt 1 entity-values)]
+     (create-proc-prep-stmnt prep-entity-vals (inc (count entity-values)) parameters))
+    )
+  )
+
 (defn- make-hash
   "Return data in hash-map"
   [results]
@@ -311,6 +354,9 @@
 (defn- make-entity
   "Return entity from hash-map"
   [entity-name hash-result]
+  (let [entity-map (read-string (str "map->" entity-name))]
+    ((eval entity-map) hash-result)
+    )
   )
 
 (defn- map-data
@@ -327,6 +373,26 @@
         :else [])
   )
 
+(defn- map-in-outType
+  [sql-ps parameters]
+  ;(widget.evalobj-gui/LoadEvalMessage  (oe/iterate-obj [parameters] "parameters"))
+  (loop [i 0 vec-buffer []]
+    (if (< i (count parameters))
+      (let [parameter (nth parameters i)
+            hash-data (cond (not= (:in-outType parameter) nil)
+                            (let [hash {(read-string (str ":" (.toLowerCase (:id parameter))))
+                                     (get-data (:in-outType parameter) sql-ps (+ i 1))}]
+                              hash
+                              )
+                            :else nil
+                            )]
+        (recur (inc i) (cond (nil? hash-data) vec-buffer :else (conj vec-buffer hash-data)) )
+        )
+      vec-buffer
+      )
+    )
+  )
+
 (defn db-get
   "Return the results of the select statement"
   [db-spec entity where-clauses limit-clause]
@@ -338,8 +404,9 @@
         sql-ps (prep-statement prep-stmt where-clauses)
         results (.executeQuery sql-ps)]
 
-    (let [vec-data (map-data results)]
-      (.close conn)
+    (let [vec-data (map-data results)
+          _1 (.close prep-stmt)
+          _2 (.close conn)]
       vec-data
       )
     )
@@ -352,16 +419,20 @@
    (def sql (str "insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity) ")"))
    (def prep-stmt (.prepareStatement conn sql))
    (def sql-ps (prep-statement prep-stmt (get-record-values entity)))
-    (def results (.executeUpdate sql-ps))
-   (.close conn)
+   (let [results (.executeUpdate sql-ps)
+         _1 (.close prep-stmt)
+         _2 (.close conn)]
+     results)
     )
   ([db-spec entity-definition entity]
    (def conn (jdbc/get-connection db-spec))
    (def sql (str "insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity)  ")"))
    (def prep-stmt (.prepareStatement conn sql))
    (def sql-ps (prep-statement prep-stmt (get-record-values entity)))
-    (def results (.executeUpdate sql-ps))
-   (.close conn)
+   (let [results (.executeUpdate sql-ps)
+         _1 (.close prep-stmt)
+         _2 (.close conn)]
+     results)
     )
   )
 
@@ -372,16 +443,20 @@
    (def sql (str "update "  (get-record-name entity) " set " (update-cl entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
     (def prep-stmt (.prepareStatement conn sql))
     (def sql-ps (prep-statement prep-stmt (get-record-values entity) where-clauses))
-    (def results (.executeUpdate sql-ps))
-   (.close conn)
+   (let [results (.executeUpdate sql-ps)
+         _1 (.close prep-stmt)
+         _2 (.close conn)]
+     results)
     )
   ([db-spec entity-definition entity where-clauses]
    (def conn (jdbc/get-connection db-spec))
    (def sql (str "update "  (get-record-name entity) " set " (update-cl entity-definition entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
    (def prep-stmt (.prepareStatement conn sql))
    (def sql-ps (prep-statement prep-stmt (get-record-values entity-definition entity) where-clauses))
-   (def results (.executeUpdate sql-ps))
-   (.close conn)
+   (let [results (.executeUpdate sql-ps)
+         _1 (.close prep-stmt)
+         _2 (.close conn)]
+     results)
     )
   )
 
@@ -392,8 +467,10 @@
   (def sql (str "delete " (get-record-name entity) (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
   (def prep-stmt (.prepareStatement conn sql))
   (def sql-ps (prep-statement prep-stmt where-clauses))
-  (def results (.executeUpdate sql-ps))
-  (.close conn)
+  (let [results (.executeUpdate sql-ps)
+        _1 (.close prep-stmt)
+        _2 (.close conn)]
+    results)
   )
 
 (defn db-count
@@ -406,9 +483,35 @@
         sql-ps (prep-statement prep-stmt where-clauses)
         results (.executeQuery sql-ps)]
 
-    (let [vec-data (map-data results)]
-      (.close conn)
+    (let [vec-data (map-data results)
+          _1 (.close prep-stmt)
+          _2 (.close conn) ]
       vec-data
+      )
+    )
+  )
+
+(defn db-proc
+  "Return the results of the select statement"
+  [db-spec ret-val? proc parameters]
+  (let [conn (jdbc/get-connection db-spec)
+        sql (str "{" (cond (true? ret-val?) "?="  :else "") " call " proc " " (cond (nil? parameters) "() }" :else (str " ( " (proc-cl parameters) " ) }")))
+        prep-stmt (.prepareCall conn sql)
+        sql-ps (proc-prep-statement prep-stmt parameters)
+        results (cond (true? ret-val?) (.executeQuery sql-ps) :else (.execute sql-ps))]
+    (cond
+      (in-outType? parameters)
+      (let [vec-data (map-in-outType sql-ps parameters)
+            _1 (.close prep-stmt)
+            _2 (.close conn) ]
+        vec-data)
+      (true? ret-val?)
+      (let [vec-data (map-data results)
+            _1 (.close prep-stmt)
+            _2 (.close conn) ]
+        vec-data
+        )
+      :else []
       )
     )
   )
