@@ -1,4 +1,6 @@
-(ns cljhelpers.FxRun)
+(ns cljhelpers.FxRun
+  (:import (javafx.event EventHandler ActionEvent)
+           (javafx.application Platform)))
 (defonce force-toolkit-init (javafx.embed.swing.JFXPanel.))
 
 (defn run-later*
@@ -27,3 +29,16 @@
 
 (defmacro event-handler [arg & body]
   `(event-handler* (fn ~arg ~@body)))
+
+(defn fx-exit
+  "Exit FX platform during lein uberjar @main"
+  []
+  (when *files-compile*
+    (future
+      (println "Exiting JavaFX Thread")
+      (Thread/sleep 2000)
+      (Platform/setImplicitExit true)
+      (Platform/exit)
+      )
+    )
+  )
