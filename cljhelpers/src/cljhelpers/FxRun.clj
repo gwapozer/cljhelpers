@@ -33,7 +33,7 @@
 (defn fx-exit
   "Exit FX platform during lein uberjar @main"
   []
-  (when *files-compile*
+  (when *compile-files*
     (future
       (println "Exiting JavaFX Thread")
       (Thread/sleep 2000)
