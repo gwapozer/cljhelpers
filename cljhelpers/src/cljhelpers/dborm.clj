@@ -25,12 +25,12 @@
     (instance? Double value) "DOUBLE"
     (instance? BigDecimal value) "DECIMAL"
     (instance? String value) "STRING"
-    (instance? (byte []) value) "BOOLEAN"
     (instance? Date value) "DATE"
     (instance? Time value) "TIME"
     (instance? Timestamp value) "TIMESTAMP"
     (instance? Blob value) "BLOB"
     (instance? Clob value) "CLOB"
+    (instance? (byte []) value) "BINARY"
     :else "OBJECT"
     )
   )
@@ -47,12 +47,12 @@
     (instance? Double value) (doto prep-stmt (.setDouble set-cnt value))
     (instance? BigDecimal value) (doto prep-stmt (.setBigDecimal set-cnt value))
     (instance? String value) (doto prep-stmt (.setString set-cnt value))
-    (instance? (byte []) value) (doto prep-stmt (.setBytes set-cnt value))
-    (instance? Date value) (doto prep-stmt (.setDate set-cnt value))
-    (instance? Time value) (doto prep-stmt (.setTime set-cnt value))
+    (instance? Date value) (doto prep-stmt (.setObject set-cnt value))
+    (instance? Time value) (doto prep-stmt (.setObject set-cnt value))
     (instance? Timestamp value) (doto prep-stmt (.setTimeStamp set-cnt value))
     (instance? Blob value) (doto prep-stmt (.setBlob set-cnt value))
     (instance? Clob value) (doto prep-stmt (.setClob set-cnt value))
+    (instance? (byte []) value) (doto prep-stmt (.setBytes set-cnt value))
     :else prep-stmt
     )
   )
@@ -148,7 +148,6 @@
      (zipmap new-keys (map #(-> entity %) new-keys))
      )
     )
-
   ([entity-definition entity]
    (let [record-keys (get-record-keys-list entity-definition entity )
          new-keys (map #(-> entity (read-string (str ":" %))) record-keys)]
@@ -222,7 +221,6 @@
 (defn- insert-cl-mapper [record-keys]
   (let [cl-mapper (apply str (butlast (apply str (repeatedly (count record-keys) #(str "?,")))))]
     cl-mapper)
-
   )
 
 (defn- insert-cl
