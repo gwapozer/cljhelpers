@@ -75,9 +75,26 @@
   )
 
 (defn o-pythagorean
-  "Pythagorean formula for oblique triangle: c^2 = a^2 + b^2 - 2ab cos C"
+  "Pythagorean formula for oblique triangle: c^2 = a^2 + b^2 - 2ab cos C; C is the angle"
   [adj opp C]
   (let [sub-formula (* (apply * [adj opp]) (Math/cos C))]
     (- (pythagorean adj opp nil) sub-formula)
     )
+  )
+
+(defn area-of-triangle
+  [b h]
+  (/ (* b h ) 2)
+  )
+
+(defn heron-triangle
+  [a b c]
+  (let [s (/ (+ a b c) 2)]
+    (root (* s (- s a) (- s b) (- s c)))
+    )
+  )
+
+(defn area-of-triangle-side-angle
+  [a b C]
+  (/ (* a b (Math/sin C)) 2)
   )
