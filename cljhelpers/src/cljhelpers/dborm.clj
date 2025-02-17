@@ -1,12 +1,10 @@
 (ns cljhelpers.dborm
   (:require [clojure.java.jdbc :as jdbc]
             [cljhelpers.fx_obj :as fx_obj]
-            [enums.enumerator :as enumobj]
-            [cljhelpers.eval-obj :as oe]
-            [widget.evalobj-gui :as egui]
-           )
+            [pointsensor_dashboard.enums.enumerator :as enumobj]
+            [cljhelpers.objEval :as oe])
   (:import (java.util Date)
-           (java.sql Time Blob Clob Timestamp Types)))
+           (java.sql Time Blob Clob Timestamp Types Statement)))
 
 (defrecord Param-Cl [id value in-outType])
 (defrecord Where-Cl [field filter value condition Where-Cl])
@@ -54,6 +52,28 @@
     (instance? Clob value) (doto prep-stmt (.setClob set-cnt value))
     (instance? (byte []) value) (doto prep-stmt (.setBytes set-cnt value))
     :else prep-stmt
+    )
+  )
+
+(defn- set-param-data [prep-stmt name value]
+  (cond
+    (nil? value) (doto prep-stmt (.setObject name value))
+    (instance? Boolean value) (doto prep-stmt (.setBoolean name value))
+    (instance? Byte value) (doto prep-stmt (.setByte name value))
+    (instance? Short value) (doto prep-stmt (.setShort name value))
+    (instance? Integer value) (doto prep-stmt (.setInt name value))
+    (instance? Long value) (doto prep-stmt (.setLong name value))
+    (instance? Float value) (doto prep-stmt (.setFloat name value))
+    (instance? Double value) (doto prep-stmt (.setDouble name value))
+    (instance? BigDecimal value) (doto prep-stmt (.setBigDecimal name value))
+    (instance? String value) (doto prep-stmt (.setString name value))
+    (instance? Date value) (doto prep-stmt (.setObject name value))
+    (instance? Time value) (doto prep-stmt (.setObject name value))
+    (instance? Timestamp value) (doto prep-stmt (.setTimeStamp name value))
+    (instance? Blob value) (doto prep-stmt (.setBlob name value))
+    (instance? Clob value) (doto prep-stmt (.setClob name value))
+    (instance? (byte []) value) (doto prep-stmt (.setBytes name value))
+    :else (println "test gs")
     )
   )
 
@@ -199,18 +219,31 @@
     )
   )
 
-(defn- get-record-keys-cl [record]
-  (let [key-list (get-record-keys-list record)]
-    (loop [i 0 my-string ""]
-      (if (< i (count key-list))
-        (do
-          (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (nth key-list i) ))
-          )
-        (do
-          (str my-string)
-          )
-        )
-      ))
+(defn- get-record-keys-cl
+  ([record]
+   (let [key-list (get-record-keys-list record)]
+     (loop [i 0 my-string ""]
+       (if (< i (count key-list))
+         (do
+           (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (nth key-list i) ))
+           )
+         (do
+           (str my-string)
+           )
+         )
+       )))
+  ([entity-definition record]
+   (let [key-list (get-record-keys-list entity-definition record)]
+     (loop [i 0 my-string ""]
+       (if (< i (count key-list))
+         (do
+           (recur (inc i) (str my-string (cond (= i 0) "" :else ", ") (nth key-list i) ))
+           )
+         (do
+           (str my-string)
+           )
+         )
+       )))
   )
 
 (defn- in-outType?
@@ -229,6 +262,10 @@
      (insert-cl-mapper record-keys)
      )
     )
+  ([entity-definition entity]
+   (let [record-keys (get-record-keys-list entity-definition entity)]
+     (insert-cl-mapper record-keys)
+     ))
   )
 
 (defn- update-cl-mapper [record-keys]
@@ -277,19 +314,19 @@
 
 (defn- create-prep-stmnt
   ([prep-stmt x clauses]
-    (loop [i 0 set-cnt x]
-      (if (< i (count clauses))
-        (do
-          (def clause (nth clauses i))
-          (set-data prep-stmt set-cnt (:value clause))
-          (if-not (nil? (:Where-Cl clause))
-            (create-prep-stmnt prep-stmt (+ set-cnt 1) (:Where-Cl clause))
-            )
-          (recur (inc i) (inc set-cnt))
-          )
-        prep-stmt
-        )
-      )
+   (loop [i 0 set-cnt x]
+     (if (< i (count clauses))
+       (do
+         (def clause (nth clauses i))
+         (set-data prep-stmt set-cnt (:value clause))
+         (if-not (nil? (:Where-Cl clause))
+           (create-prep-stmnt prep-stmt (+ set-cnt 1) (:Where-Cl clause))
+           )
+         (recur (inc i) (inc set-cnt))
+         )
+       prep-stmt
+       )
+     )
     )
   )
 
@@ -306,14 +343,12 @@
   ([prep-stmt x parameters]
    (loop [i 0 set-cnt x]
      (if (< i (count parameters))
-       (do
-         (def parameter (nth parameters i))
+       (let [parameter (nth parameters i)]
          (cond (nil? (:in-outType parameter))
-               (set-data prep-stmt set-cnt (:value parameter))
+               (set-param-data prep-stmt (:id parameter) (:value parameter))
                :else
                (set-data-out prep-stmt set-cnt (:in-outType parameter))
                )
-
          (recur (inc i) (inc set-cnt))
          )
        prep-stmt
@@ -373,13 +408,12 @@
 
 (defn- map-in-outType
   [sql-ps parameters]
-  ;(widget.evalobj-gui/LoadEvalMessage  (oe/iterate-obj [parameters] "parameters"))
   (loop [i 0 vec-buffer []]
     (if (< i (count parameters))
       (let [parameter (nth parameters i)
             hash-data (cond (not= (:in-outType parameter) nil)
                             (let [hash {(read-string (str ":" (.toLowerCase (:id parameter))))
-                                     (get-data (:in-outType parameter) sql-ps (+ i 1))}]
+                                        (get-data (:in-outType parameter) sql-ps (+ i 1))}]
                               hash
                               )
                             :else nil
@@ -413,45 +447,53 @@
 (defn db-insert
   "Add"
   ([db-spec entity]
-   (def conn (jdbc/get-connection db-spec))
-   (def sql (str "insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity) ")"))
-   (def prep-stmt (.prepareStatement conn sql))
-   (def sql-ps (prep-statement prep-stmt (get-record-values entity)))
-   (let [results (.executeUpdate sql-ps)
+   (let [
+         conn (jdbc/get-connection db-spec)
+         sql (str "SET IDENTITY_INSERT " (get-record-name entity) " OFF insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity) ") SET IDENTITY_INSERT " (get-record-name entity) " ON")
+         prep-stmt (.prepareStatement conn sql Statement/RETURN_GENERATED_KEYS)
+         sql-ps (prep-statement prep-stmt (get-record-values entity))
+         results (.execute sql-ps)
+         gk-rslt (.getGeneratedKeys sql-ps)
+         _hasgk? (.next gk-rslt)
+         _genKeys (cond (true? _hasgk?) (make-hash gk-rslt) :else nil)
          _1 (.close prep-stmt)
          _2 (.close conn)]
-     results)
+     _genKeys)
     )
   ([db-spec entity-definition entity]
-   (def conn (jdbc/get-connection db-spec))
-   (def sql (str "insert into "  (get-record-name entity) " (" (get-record-keys-cl entity) ") " "values (" (insert-cl entity)  ")"))
-   (def prep-stmt (.prepareStatement conn sql))
-   (def sql-ps (prep-statement prep-stmt (get-record-values entity)))
-   (let [results (.executeUpdate sql-ps)
+   (let [
+         conn (jdbc/get-connection db-spec)
+         sql (str "SET IDENTITY_INSERT " (get-record-name entity) " OFF insert into "  (get-record-name entity) " (" (get-record-keys-cl entity-definition entity) ") " "values (" (insert-cl entity-definition entity)  ") SET IDENTITY_INSERT " (get-record-name entity) " ON")
+         prep-stmt (.prepareStatement conn sql Statement/RETURN_GENERATED_KEYS)
+         sql-ps (prep-statement prep-stmt (get-record-values entity-definition entity))
+         results (.execute sql-ps)
+         gk-rslt (.getGeneratedKeys sql-ps)
+         _hasgk? (.next gk-rslt)
+         _genKeys (cond (true? _hasgk?) (make-hash gk-rslt) :else nil)
          _1 (.close prep-stmt)
          _2 (.close conn)]
-     results)
+     _genKeys)
     )
   )
 
 (defn db-update
   "update"
   ([db-spec entity where-clauses]
-   (def conn (jdbc/get-connection db-spec))
-   (def sql (str "update "  (get-record-name entity) " set " (update-cl entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
-    (def prep-stmt (.prepareStatement conn sql))
-    (def sql-ps (prep-statement prep-stmt (get-record-values entity) where-clauses))
-   (let [results (.executeUpdate sql-ps)
+   (let [conn (jdbc/get-connection db-spec)
+         sql (str "update "  (get-record-name entity) " set " (update-cl entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses))))
+         prep-stmt (.prepareStatement conn sql)
+         sql-ps (prep-statement prep-stmt (get-record-values entity) where-clauses)
+         results (.executeUpdate sql-ps)
          _1 (.close prep-stmt)
          _2 (.close conn)]
      results)
     )
   ([db-spec entity-definition entity where-clauses]
-   (def conn (jdbc/get-connection db-spec))
-   (def sql (str "update "  (get-record-name entity) " set " (update-cl entity-definition entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses)))))
-   (def prep-stmt (.prepareStatement conn sql))
-   (def sql-ps (prep-statement prep-stmt (get-record-values entity-definition entity) where-clauses))
-   (let [results (.executeUpdate sql-ps)
+   (let [conn (jdbc/get-connection db-spec)
+         sql (str "update "  (get-record-name entity) " set " (update-cl entity-definition entity) " " (cond (nil? where-clauses) "" :else (str " where " (where-cl where-clauses))))
+         prep-stmt (.prepareStatement conn sql)
+         sql-ps (prep-statement prep-stmt (get-record-values entity-definition entity) where-clauses)
+         results (.executeUpdate sql-ps)
          _1 (.close prep-stmt)
          _2 (.close conn)]
      results)
@@ -493,10 +535,11 @@
   "Return the results of the select statement"
   [db-spec ret-val? proc parameters]
   (let [conn (jdbc/get-connection db-spec)
-        sql (str "{" (cond (true? ret-val?) "?="  :else "") " call " proc " " (cond (nil? parameters) "() }" :else (str " ( " (proc-cl parameters) " ) }")))
+        sql (str "{" (cond (false? ret-val?) "?="  :else "") " call " proc " " (cond (nil? parameters) "() }" :else (str " ( " (proc-cl parameters) " ) }")))
         prep-stmt (.prepareCall conn sql)
         sql-ps (proc-prep-statement prep-stmt parameters)
-        results (cond (true? ret-val?) (.executeQuery sql-ps) :else (.execute sql-ps))]
+        results (cond (true? ret-val?) (.executeQuery sql-ps) :else (.execute sql-ps))
+        ]
     (cond
       (in-outType? parameters)
       (let [vec-data (map-in-outType sql-ps parameters)
@@ -511,5 +554,28 @@
         )
       :else []
       )
+    )
+  )
+
+(defn db-query
+  "Return the results of the select statement"
+  [db-spec query]
+  (let [conn (jdbc/get-connection db-spec)
+        prep-stmt (.prepareStatement conn query)
+        results (.executeQuery prep-stmt)]
+    (let [vec-data (map-data results)
+          _1 (.close prep-stmt)
+          _2 (.close conn)]
+      vec-data
+      )
+    )
+  )
+
+(defn db-query-update
+  "Return the results of the select statement"
+  [db-spec query]
+  (let [conn (jdbc/get-connection db-spec)
+        prep-stmt (.createStatement conn )
+        _ (.executeUpdate prep-stmt query)]
     )
   )

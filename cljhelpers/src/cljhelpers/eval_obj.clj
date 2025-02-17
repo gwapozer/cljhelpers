@@ -1,4 +1,4 @@
-(ns cljhelpers.eval-obj
+(ns cljhelpers.eval_obj
   (:require [clojure.string :as str]))
 
 (defn iterate-obj [obj-list msg]
@@ -46,9 +46,9 @@
     (do
       (def updated-data
         (if (vector? data)
-           (map (fn [x] (update-in x (first (first updators)) (first (rest (first updators))))) data)
-           (update-in data (first (first updators)) (first (rest (first updators)))))
-          )
+          (map (fn [x] (update-in x (first (first updators)) (first (rest (first updators))))) data)
+          (update-in data (first (first updators)) (first (rest (first updators)))))
+        )
       (update-obj (rest updators) updated-data)
       )
     (if (vector? data)
